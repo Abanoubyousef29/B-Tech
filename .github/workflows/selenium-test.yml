@@ -79,14 +79,14 @@ jobs:
 
       - name: Upload Surefire XML report as artifact
         if: success()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: surefire-reports
           path: target/surefire-reports
 
       - name: Upload Markdown table as artifact
         if: success()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: test-results
           path: markdown_table.md
