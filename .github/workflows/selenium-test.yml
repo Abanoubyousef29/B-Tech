@@ -3,10 +3,11 @@ name: Selenium Tests with Firefox
 on:
   push:
     branches:
-      - master  # Trigger on push to the master branch
+      - master
   pull_request:
     branches:
-      - master  # Trigger on pull requests targeting the master branch
+      - master
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -14,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up JDK and Maven
         uses: actions/setup-java@v2
@@ -22,7 +23,7 @@ jobs:
           java-version: '17'
           distribution: 'adopt'
           architecture: 'x64'
-          maven-version: '3.1.0'  # Specify the Maven version if needed
+          maven-version: '3.1.0'
 
       - name: Install xmlstarlet
         run: sudo apt-get install -y xmlstarlet
@@ -34,7 +35,7 @@ jobs:
         run: docker run --rm selenium/standalone-firefox:latest firefox --version
 
       - name: Build and Test with Maven
-        run: mvn clean verify  # Adjust this command based on your Maven goals
+        run: mvn clean verify
 
       - name: Display Surefire XML report
         if: always()
@@ -49,31 +50,31 @@ jobs:
           failed_tests=$(xmlstarlet sel -t -v "/testng-results/@failed" target/surefire-reports/testng-results.xml)
           skipped_tests=$(xmlstarlet sel -t -v "/testng-results/@skipped" target/surefire-reports/testng-results.xml)
           passed_tests=$(xmlstarlet sel -t -v "/testng-results/@passed" target/surefire-reports/testng-results.xml)
-          echo "::set-output name=passed::$passed_tests"
-          echo "::set-output name=failed::$failed_tests"
-          echo "::set-output name=skipped::$skipped_tests"
-          echo "::set-output name=total::$total_tests"
+          echo "passed=$passed_tests" >> $GITHUB_ENV
+          echo "failed=$failed_tests" >> $GITHUB_ENV
+          echo "skipped=$skipped_tests" >> $GITHUB_ENV
+          echo "total=$total_tests" >> $GITHUB_ENV
 
       - name: Display test results summary
         if: always()
         run: |
-          echo "Total test cases = ${{ steps.extract_results.outputs.total }}"
-          echo "Passed test cases = ${{ steps.extract_results.outputs.passed }}"
-          echo "Failed test cases = ${{ steps.extract_results.outputs.failed }}"
+          echo "Total test cases = ${{ env.total }}"
+          echo "Passed test cases = ${{ env.passed }}"
+          echo "Failed test cases = ${{ env.failed }}"
 
       - name: Generate Markdown table
         id: generate_markdown_table
         run: |
-          echo "### Test Results:"
-          echo "### Passed Test Cases:"
-          xmlstarlet sel -t -m "//test-method[@status='PASS' and not(@name=preceding::test-method[@status='PASS']/@name)]" -v "@name" -n target/surefire-reports/testng-results.xml
-          echo "------------------------------"
-          echo "### Failed Test Cases:"
+          echo "### Test Results:" > markdown_table.md
+          echo "### Passed Test Cases:" >> markdown_table.md
+          xmlstarlet sel -t -m "//test-method[@status='PASS' and not(@name=preceding::test-method[@status='PASS']/@name)]" -v "@name" -n target/surefire-reports/testng-results.xml >> markdown_table.md
+          echo "------------------------------" >> markdown_table.md
+          echo "### Failed Test Cases:" >> markdown_table.md
           failed_tests=$(xmlstarlet sel -t -v "count(//test-method[@status='FAIL'])" target/surefire-reports/testng-results.xml)
           if [ "$failed_tests" -gt 0 ]; then
-            xmlstarlet sel -t -m "//test-method[@status='FAIL' and not(@name=preceding::test-method[@status='FAIL']/@name)]" -v "@name" -n target/surefire-reports/testng-results.xml
+            xmlstarlet sel -t -m "//test-method[@status='FAIL' and not(@name=preceding::test-method[@status='FAIL']/@name)]" -v "@name" -n target/surefire-reports/testng-results.xml >> markdown_table.md
           else
-            echo "No failed test cases."
+            echo "No failed test cases." >> markdown_table.md
           fi
 
       - name: Upload Surefire XML report as artifact
@@ -88,4 +89,4 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: test-results
-          path: markdown_table.md  # Adjust the path if necessary
+          path: markdown_table.md
